@@ -4,6 +4,7 @@
 
 import * as Azure from 'azure-storage';
 import requiredParameter from './RequiredParameter';
+import streamBuffers from 'stream-buffers';
 
 export class AzureStorageAdapter {
   // Creates an Azure Storage Client.
@@ -77,13 +78,18 @@ export class AzureStorageAdapter {
    */
   getFileData(filename) {
     return new Promise((resolve, reject) => {
-      this._client.getBlobToText(this._container, filename, (err, text, blob, res) => {
-        if (err) {
-          return reject(err);
-        }
-
-        resolve(new Buffer(text));
+      let writableStreamBuffer = new streamBuffers.WritableStreamBuffer({
+          initialSize: (100 * 1024),   // start at 100 kilobytes.
+          incrementAmount: (100 * 1024) // grow by 100 kilobytes each time buffer overflows.
       });
+      this._client.getBlobToStream(this._container, filename, writableStreamBuffer, (err, blob) => {
+        if (err) {
+            console.error(err)
+            return reject(err);
+          }
+
+          resolve(writableStreamBuffer.getContents());
+        });
     });
   }
 
